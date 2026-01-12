@@ -3781,7 +3781,7 @@ Pointers containing `extras` properties are out of scope of this specification b
 [NOTE]
 .Authoring Note
 ====
-The `/meshes/{}/weights` and `/nodes/{}/weights` pointers defined in the glTF Asset Object Model have the `float[]` type that is not supported by this extension. Any `pointer/get` node using those pointers would always have its `isValid` output value as false.
+The `/nodes/{}/weights` pointer defined in the glTF Asset Object Model has the `float[]` type that is not supported by this extension. Any `pointer/get` node using that pointer would always have its `isValid` output value as false.
 ====
 
 ===== Pointer Set
@@ -3848,7 +3848,7 @@ When the `in` input flow is activated:
 [NOTE]
 .Authoring Note
 ====
-The `/meshes/{}/weights` and `/nodes/{}/weights` pointers defined in the glTF Asset Object Model have the `float[]` type that is not supported by this extension. Any `pointer/set` node using those pointers would always activate only its `err` output flow.
+The `/nodes/{}/weights` pointer defined in the glTF Asset Object Model has the `float[]` type that is not supported by this extension. Any `pointer/set` node using that pointer would always activate only its `err` output flow.
 ====
 
 ===== Pointer Interpolate
@@ -3959,7 +3959,7 @@ Certain control point values can cause the intermediate output progress value to
 [NOTE]
 .Authoring Note
 ====
-The `/meshes/{}/weights` and `/nodes/{}/weights` pointers defined in the glTF Asset Object Model have the `float[]` type that is not supported by this extension. Any `pointer/interpolate` node using those pointers would always activate only its `err` output flow.
+The `/nodes/{}/weights` pointer defined in the glTF Asset Object Model has the `float[]` type that is not supported by this extension. Any `pointer/interpolate` node using that pointer would always activate only its `err` output flow.
 ====
 
 ==== Animation Control Nodes
