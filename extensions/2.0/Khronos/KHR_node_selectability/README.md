@@ -84,30 +84,32 @@ The following pointer template represents the mutable property defined by this e
 
 Unless used in conjunction with `KHR_interactivity`, the result of a “select” action on a given object is left up to the implementation.
 
-When used in conjunction with `KHR_interactivity`, a new interactivity event is defined as follows:
+When used in conjunction with `KHR_interactivity`, a new interactivity operation is defined as follows:
 
-|                         |                  | |
-|-------------------------|------------------|-|
-| **Type**                | `event/onSelect` | Select event |
-| **Configuration**       | `int nodeIndex`        | Index of a node that has this event handler |
-|                         | `bool stopPropagation` | Whether to allow parents of this node to also receive the event |
-| **Output values**       | `int selectedNodeIndex` | Index of the actual node that was selected by the user |
-|                         | `int controllerIndex`   | Index of the controller that generated the event |
-|                         | `float3 selectionPoint`     | Position of intersection of the selection ray with the geometry of the selected node in global space |
+|                         |                             | |
+|-------------------------|-----------------------------|-|
+| **Operation**           | `event/onSelect`            | Select event |
+| **Configuration**       | `int nodeIndex`             | Index of the glTF node that has this event handler |
+| **Output values**       | `ref selectedNode`          | Reference to the glTF node that was selected by the user |
+|                         | `int controllerIndex`       | Index of the controller that generated the event |
+|                         | `float3 selectionPoint`     | Position of intersection of the selection ray with the geometry of the selected glTF node in global space |
 |                         | `float3 selectionRayOrigin` | Position of the origin of the selection ray in global space |
-| **Output flow sockets** | `out` | The flow to be activated when a select event happens on the given node |
+|                         | `ref event`                 | The event reference |
+| **Output flow sockets** | `out` | The flow to be activated when the select event happens |
 
-This interactivity event node is activated when a “select” event occurs on a glTF node `nodeIndex` or on any node in its subtree subject to the following propagation rule: the lowest node in the tree receives the select event first, and the event bubbles up the tree until a glTF node with an associated `event/onSelect` behavior graph node with its `stopPropagation` configuration value set to `true` is found.
+Interactivity nodes with this operation are activated when a “select” event occurs on a glTF node `nodeIndex` or on any glTF node in its subtree subject to the following propagation rule: the lowest glTF node in the tree receives the select event first, and the event bubbles up the tree until a glTF node with an associated `event/onSelect` interactivity node is found.
 
-If the `nodeIndex` configuration value is negative or greater than or equal to the number of glTF nodes in the asset, the `event/onSelect` node is invalid. A behavior graph **MUST NOT** contain two or more `event/onSelect` nodes with the same `nodeIndex` configuration value.
+If the `nodeIndex` configuration value is negative or greater than or equal to the number of glTF nodes in the asset, the `event/onSelect` interactivity node is invalid.
 
-The internal state of this node consists of the `selectionPoint` and `selectionRayOrigin` output values initialized to NaN vectors and the `selectedNodeIndex` and `controllerIndex` output values initialized to -1.
+The internal state of this interactivity node consists of the `selectionPoint` and `selectionRayOrigin` output values initialized to NaN vectors, the `selectedNode` and `controllerIndex` output values initialized to null and -1 respectively, and the `event` output value initialized to null.
 
 In the case of multiple-controller systems, the `controllerIndex` output value **MUST** be set to the index of the controller that generated the event; in single-controller systems, this output value **MUST** be set to zero.
 
 If the implementation provides selection ray information, the `selectionPoint` and `selectionRayOrigin` output values **MUST** be updated with it; otherwise, they **MUST** be set to NaN vectors.
 
 The output value sockets **MUST** be updated before activating the `out` output flow.
+
+If multiple interactivity nodes with this operation and the same configuration exist in the graph, they **MUST** be activated sequentially in the order they appear in JSON and they **MUST** have the same output values within the same event occurrence.
 
 ## JSON Schema
 
