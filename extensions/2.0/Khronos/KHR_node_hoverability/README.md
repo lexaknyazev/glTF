@@ -88,39 +88,49 @@ The following pointer template represents the mutable property defined by this e
 
 Unless used in conjunction with `KHR_interactivity`, the result of a “hover” action on a given object is left up to the implementation.
 
-When used in conjunction with `KHR_interactivity`, two new interactivity events, `event/onHoverIn` and `event/onHoverOut`, are defined as follows:
+When used in conjunction with `KHR_interactivity`, two new interactivity operations, `event/onHoverIn` and `event/onHoverOut`, are defined as follows:
 
-|                         |                   | |
-|-------------------------|-------------------|-|
-| **Type**                | `event/onHoverIn` | Hover In event |
-| **Configuration**       | `int nodeIndex`        | Index of a node that has this event handler |
-|                         | `bool stopPropagation` | Whether to allow parents of this node to also receive the event |
-| **Output values**       | `int hoverNodeIndex`  | Index of the actual node on which “hover” action was started |
+|                         |                       | |
+|-------------------------|-----------------------|-|
+| **Operation**           | `event/onHoverIn`     | Hover In event |
+| **Configuration**       | `int nodeIndex`       | Index of the glTF node that has this event handler |
+| **Output values**       | `ref hoverNode`       | Reference to the glTF node on which “hover” action was started |
 |                         | `int controllerIndex` | Index of the controller that generated the event |
-| **Output flow sockets** | `out` | The flow to be activated when a “hover” event happens on the given node |
+|                         | `ref event`           | The event reference |
+| **Output flow sockets** | `out`                 | The flow to be activated when the Hover In event happens |
 
-This interactivity event node is activated when a “hover” action is started on a glTF node `nodeIndex` or on any node in its subtree subject to the following propagation rule: the lowest node in the tree receives the “hover” event first, and the event bubbles up the tree until a glTF node with the associated `event/onHoverIn` behavior graph node with its `stopPropagation` configuration value set to `true` is found or until the currently processed node's subtree includes both the prior and the current hover targets for the given controller, whichever occurs first. In other words, a glTF node N only receives a new Hover In event when a “hover” action enters N’s subtree, not on each change of state within that subtree.
+Interactivity nodes with this operation are activated when a “hover” action is started on a glTF node `nodeIndex` or on any glTF node in its subtree subject to the following propagation rule: the lowest glTF node in the tree receives the “hover” event first, and the event bubbles up the tree until a glTF node with the associated `event/onHoverIn` interactivity node is found or until the currently processed glTF node's subtree includes both the prior and the current hover targets for the given controller, whichever occurs first. In other words, a glTF node N only receives a new Hover In event when a “hover” action enters N’s subtree, not on each change of state within that subtree.
 
-If the `nodeIndex` configuration value is negative or greater than or equal to the number of glTF nodes in the asset, the `event/onHoverIn` node is invalid. A behavior graph **MUST NOT** contain two or more `event/onHoverIn` nodes with the same `nodeIndex` configuration value.
+If the `nodeIndex` configuration value is negative or greater than or equal to the number of glTF nodes in the asset, the `event/onHoverIn` interactivity node is invalid.
 
-The internal state of this node consists of the `hoverNodeIndex` and `controllerIndex` output values initialized to -1.
+The internal state of this interactivity node consists of the `hoverNode`, `controllerIndex`, and `event` output values initialized to null, -1, and null respectively.
 
 In the case of multiple-controller systems, the `controllerIndex` output value **MUST** be set to the index of the controller that generated the event; in single-controller systems, this output value **MUST** be set to zero.
 
 The output value sockets **MUST** be updated before activating the `out` output flow.
 
-|                         |                    | |
-|-------------------------|--------------------|-|
-| **Type**                | `event/onHoverOut` | Hover Out event |
-| **Configuration**       | `int nodeIndex`        | Index of a node that has this event handler |
-|                         | `bool stopPropagation` | Whether to allow parents of this node to also receive the event |
-| **Output values**       | `int hoverNodeIndex`  | Index of the actual node on which “hover” action was initiated |
+If multiple interactivity nodes with this operation and the same configuration exist in the graph, they **MUST** be activated sequentially in the order they appear in JSON and they **MUST** have the same output values within the same event occurrence.
+
+|                         |                       | |
+|-------------------------|-----------------------|-|
+| **Operation**           | `event/onHoverOut`    | Hover Out event |
+| **Configuration**       | `int nodeIndex`       | Index of the glTF node that has this event handler |
+| **Output values**       | `ref hoverNode`       | Reference to the glTF node on which “hover” action was initiated |
 |                         | `int controllerIndex` | Index of the controller that generated the event |
-| **Output flow sockets** | `out` | The flow to be activated when a “hover” event happens on the given node |
+|                         | `ref event`           | The event reference |
+| **Output flow sockets** | `out`                 | The flow to be activated when the Hover Out event happens |
 
-This interactivity event node is activated when a “hover” action is stopped on a glTF node `nodeIndex` or on any node in its subtree subject to the following propagation rule: the lowest node in the tree receives the “hover” event first, and the event bubbles up the tree until a glTF node with the associated `event/onHoverOut` behavior graph node with its `stopPropagation` configuration value set to `true` is found or until the currently processed node's subtree includes both the prior and the current hover targets for the given controller, whichever occurs first. In other words, a glTF node N only receives a new Hover Out event when a “hover” action exits N’s entire subtree, not on each change of state within that subtree.
+Interactivity nodes with this operation are activated when a “hover” action is stopped on a glTF node `nodeIndex` or on any glTF node in its subtree subject to the following propagation rule: the lowest glTF node in the tree receives the “hover” event first, and the event bubbles up the tree until a glTF node with the associated `event/onHoverOut` interactivity node is found or until the currently processed glTF node's subtree includes both the prior and the current hover targets for the given controller, whichever occurs first. In other words, a glTF node N only receives a new Hover Out event when a “hover” action exits N’s entire subtree, not on each change of state within that subtree.
 
-This node has the same validation and internal state rules as `event/onHoverIn`.
+If the `nodeIndex` configuration value is negative or greater than or equal to the number of glTF nodes in the asset, the `event/onHoverOut` interactivity node is invalid.
+
+The internal state of this interactivity node consists of the `hoverNode`, `controllerIndex`, and `event` output values initialized to null, -1, and null respectively.
+
+In the case of multiple-controller systems, the `controllerIndex` output value **MUST** be set to the index of the controller that generated the event; in single-controller systems, this output value **MUST** be set to zero.
+
+The output value sockets **MUST** be updated before activating the `out` output flow.
+
+If multiple interactivity nodes with this operation and the same configuration exist in the graph, they **MUST** be activated sequentially in the order they appear in JSON and they **MUST** have the same output values within the same event occurrence.
 
 ## JSON Schema
 
