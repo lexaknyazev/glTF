@@ -328,6 +328,9 @@ a 4x4 matrix of *float* values
 int::
 a two's complement 32-bit signed integer scalar value
 
+ref::
+an opaque reference value
+
 [[nodes-configuration]]
 === Configuration
 
@@ -404,6 +407,7 @@ Custom variables use the same type system as the value sockets. The following ta
 | `float3x3` | Nine floating-point NaNs
 | `float4x4` | Sixteen floating-point NaNs
 | `int`      | Integer zero
+| `ref`      | Null reference
 |===
 
 [[limits]]
@@ -952,7 +956,7 @@ d| `T b` | Negative selection option
 | `T value` | stem:[a] if the `condition` input value is true; stem:[b] otherwise
 |===
 
-The type `T` represents any supported type including custom types. It **MUST** be the same for the output value socket and the input value sockets stem:[a] and stem:[b].
+The type `T` represents any supported type including numeric, reference, and custom types. It **MUST** be the same for the output value socket and the input value sockets stem:[a] and stem:[b].
 
 ===== Switch
 
@@ -976,7 +980,7 @@ The configuration of this operation affects its value sockets.
 
 The operation has zero or more `<case>` input value sockets corresponding to the elements of the `cases` configuration array.
 
-The type `T` represents any supported type including custom types. The type of the `value` output value socket is the same as the type of the `default` input value socket.
+The type `T` represents any supported type including numeric, reference, and custom types. The type of the `value` output value socket is the same as the type of the `default` input value socket.
 
 In the default configuration, the `cases` configuration array is empty and the operation has only the `default` and `selection` input value sockets.
 
@@ -2873,6 +2877,28 @@ d| `bool b` | Second argument
 | `bool value` | True if and only if stem:[a] is not equal to stem:[b]; false otherwise
 |===
 
+=== Reference Operations
+
+==== Reference Comparison Operations
+
+===== Equality
+
+[cols="1h,1,2"]
+|===
+| Operation | `ref/eq` | Equality operation
+.2+| Input value sockets
+d| `ref a` | First argument
+d| `ref b` | Second argument
+| Output value sockets
+| `bool value` | True if the input arguments are equal; false otherwise
+|===
+
+Valid references are equal if and only if they refer to the same object.
+
+If any argument is an invalidated reference, the comparison result is undefined.
+
+All null references are equal to each other. A null reference is not equal to a non-null reference.
+
 === Type Conversion Operations
 
 ==== Boolean Conversion Operations
@@ -3367,16 +3393,16 @@ d| `cancel` | When this flow is activated, all delayed activations scheduled by 
 | Input value sockets
 | `float duration` | The duration, in seconds, to delay the `done` output flow activation
 | Output value sockets
-| `int lastDelayIndex` | The delay index assigned during the last successful interactivity node's execution
+| `ref lastDelay` | The reference to a delay scheduled during the last successful execution of the interactivity node
 .3+| Output flow sockets
 d| `out` | The flow to be activated if the `duration` value is valid
 d| `err` | The flow to be activated if the `duration` value is invalid
 d| `done` | The flow to be activated after the delay
 |===
 
-The internal state of this operation consists of an integer `lastDelayIndex` value initialized to -1 and a dynamic array of activation indices scheduled by the interactivity node executions. This array is initially empty and its maximum size is implementation-specific.
+The internal state of this operation consists of a reference `lastDelay` value initialized to null and a dynamic array of activation references scheduled by the interactivity node executions. This array is initially empty and its maximum size is implementation-specific.
 
-The internal state of an execution graph having one or more interactivity nodes with the `flow/setDelay` operation includes a dynamic array of activation indices scheduled from all such interactivity nodes. This array is initially empty and its maximum size is implementation-specific.
+The internal state of an execution graph having one or more interactivity nodes with the `flow/setDelay` operation includes a dynamic array of activation references scheduled from all such interactivity nodes. This array is initially empty and its maximum size is implementation-specific.
 
 Implementations **MUST** be aware of their effective limit on the maximum supported `duration` input value to avoid any implicit behavior changes, e.g., due to numeric overflows; exceeding such value **MUST** lead to the `err` output flow activation as described below.
 
@@ -3390,18 +3416,18 @@ When the `in` input flow is activated:
 4. Let _activationTime_ be an implementation-defined high-precision time value equal to the sum of the current time value and the `duration` input value converted to the same time type.
 5. If _activationTime_ is not valid according to implementation-specific validation rules, e.g., it exceeds an internal threshold value,
 .. activate the `err` output flow and skip the next steps.
-6. Set `lastDelayIndex` to a non-negative value representing the delayed flow activation being scheduled. This value **MUST** be unique across all previous activations of all interactivity nodes with the `flow/setDelay` operation.
-7. Push the value of `lastDelayIndex` to the graph and interactivity node arrays of activation indices.
+6. Set `lastDelay` to a non-null reference value representing the delayed flow activation being scheduled. This value **MUST** be unique across all delay reference values of all interactivity nodes with the `flow/setDelay` operation.
+7. Push the value of `lastDelay` to the graph and interactivity node arrays of activation references.
 8. Schedule the following actions at the _activationTime_ time:
-.. Removal of the activation index value from both arrays of activation indices.
+.. Removal of the activation reference value from both arrays of activation references.
 .. Activation of the `done` output flow.
 9. Activate the `out` output flow.
 
 When the `cancel` input flow is activated:
 
-1. Set the `lastDelayIndex` value to -1.
-2. For each activation index value in the interactivity node's array of activation indices:
-.. Remove this activation index value from the interactivity node's and the graph's arrays of activation indices.
+1. Set the `lastDelay` value to null.
+2. For each activation reference value in the interactivity node's array of activation references:
+.. Remove this activation reference value from the interactivity node's and the graph's arrays of activation references.
 .. Cancel the corresponding scheduled activation.
 
 ===== Cancel Delay
@@ -3412,7 +3438,7 @@ When the `cancel` input flow is activated:
 | Input flow sockets
 | `in` | The entry flow into this operation
 | Input value sockets
-| `int delayIndex` | The index value of the scheduled activation to be cancelled
+| `ref delay` | The reference value of the scheduled activation to be cancelled
 | Output flow sockets
 | `out` | The flow to be activated after executing this operation
 |===
@@ -3421,12 +3447,12 @@ This operation has no internal state but its execution **MAY** affect internal s
 
 When the `in` input flow is activated:
 
-1. Evaluate the `delayIndex` input value.
-2. Remove this activation index value from all arrays of activation indices if it exists.
+1. Evaluate the `delay` input value.
+2. Remove this activation reference value from all arrays of activation references if it exists.
 3. Cancel the corresponding scheduled activation if it exists.
 4. Activate the `out` output flow.
 
-Non-positive or not existing delay index values **MUST NOT** cause any runtime errors.
+Null or invalid delay reference values **MUST NOT** cause any runtime errors.
 
 === State Manipulation Operations
 
@@ -3617,12 +3643,12 @@ Both pointers are functional even if the glTF nodes do not belong to the current
 Implementations that import glTF assets into pre-existing scenes may need to maintain mappings between their internal objects and glTF objects defined in the asset. If the implementation's coordinate system is different from the one used in glTF, extra runtime conversions may be necessary for properties that depend on the XYZ axes.
 ====
 
-When a behavior graph is loaded, all JSON Pointer Templates **MUST** be processed as described in the following sections. If a pointer template contains path segments wrapped in curly brackets, called _template parameters_, they define input value socket ids (with the curly brackets stripped) for the interactivity node. These template parameters **MUST NOT** be empty; the same parameter **MUST NOT** be used more than once within a template string. If used literally, curly brackets **MUST** be doubled, i.e, `{` **MUST** be written as `{{`, and `}` **MUST** be written as `}}` when used within path segments; curly brackets **MUST NOT** be used within parameters. Tilde (`~`) and forward slash (`/`) characters used in path segments or parameters **MUST** be encoded as `~0` and `~1` respectively as defined in <<rfc6901,RFC 6901>>.
+When a behavior graph is loaded, all JSON Pointer Templates **MUST** be processed as described in the following sections. If a pointer template contains path segments wrapped in square or curly brackets, called _template parameters_, they define input value socket ids (with the square or curly brackets stripped) for the interactivity node. These template parameters **MUST NOT** be empty; the same parameter **MUST NOT** be used more than once within a template string. If used literally, square and curly brackets **MUST** be doubled, i.e, `{` **MUST** be written as `{{`, and `}` **MUST** be written as `}}` when used within path segments; square or curly brackets **MUST NOT** be used within parameters. Tilde (`~`) and forward slash (`/`) characters used in path segments or parameters **MUST** be encoded as `~0` and `~1` respectively as defined in <<rfc6901,RFC 6901>>.
 
 [NOTE]
 .Implementation Note
 ====
-None of the glTF properties currently defined in Khronos specifications contain curly brackets, forward slash, or tilde in their names but such properties can exist in arbitrary glTF assets within vendor-specific extensions or `extras` objects.
+None of the glTF properties currently defined in Khronos specifications contain square or curly brackets, forward slash, or tilde in their names but such properties can exist in arbitrary glTF assets within vendor-specific extensions or `extras` objects.
 ====
 
 When an Object Model Access operation is activated, its JSON Pointer Template and input values (if present) are used to generate the effective JSON Pointer string value.
@@ -3631,7 +3657,7 @@ If the property being accessed is also affected by a currently active animation,
 
 ===== JSON Pointer Template Parsing
 
-The input to these steps is the `pointer` string configuration value; the output includes a boolean validity flag and a template parameter array. Each template parameter array entry consists of a string representing the corresponding input value socket id and the parameter substring location (e.g., start and end offsets) in the JSON Pointer Template.
+The input to these steps is the `pointer` string configuration value; the output includes a boolean validity flag and a template parameter array. Each template parameter array entry consists of a string representing the corresponding input value socket id, its type: integer or reference, and the parameter substring location (e.g., start and end offsets) in the JSON Pointer Template.
 
 Implementations **MAY** optimize these steps as long as such optimizations do not change the output.
 
@@ -3639,20 +3665,29 @@ Implementations **MAY** optimize these steps as long as such optimizations do no
 2. If the pointer template string is not a syntactically valid JSON Pointer as defined in <<rfc6901,RFC 6901>> regardless of the pointer applicability to the glTF asset and/or template parameters, reject the pointer template string with a syntax error.
 3. Split the pointer template string at all matches of the forward slash character (`/`, `0x2F`). This step produces a path segment array consisting of a substring before the first match, substrings between the matches, and a substring after the last match.
 4. For each path segment substring produced during step 3:
-.. If the path segment consists of a single left curly bracket (`{`, `0x7B`) character,
+.. If the path segment consists of a single left square bracket (`[`, `0x5B`) character or a single left curly bracket (`{`, `0x7B`) character,
 ... set the validity flag to false, ignore all other segments, and goto step 5.
+.. If the first character of the path segment substring is a left square bracket and the second character is not a left square bracket:
+... Assume the path segment substring to be an integer template parameter.
+... If the path segment substring contains left square or curly brackets not including the first character, right square (`]`, `0x5D`) or right curly (`}`, `0x7D`) brackets not including the last character, if it does not end with a right square bracket, or if there are no characters between the first and the last square brackets (i.e., if the entire path segment substring is `[]`), set the validity flag to false, ignore all other segments, and goto step 5.
+... Derive the input value socket id as follows:
+.... Strip the first and the last characters, i.e., the leading left and trailing right square brackets.
+.... Replace all instances of `~1` with `/`.
+.... Replace all instances of `~0` with `~`.
+... If the template parameter array contains an element with the same value socket id regardless of the type, set the validity flag to false and goto step 5.
+... Add a new entry to the template parameter array consisting of the derived input value socket id, the integer type, and the path segment substring location in the pointer template string.
 .. If the first character of the path segment substring is a left curly bracket and the second character is not a left curly bracket:
-... Assume the path segment substring to be a template parameter.
-... If the path segment substring contains left curly brackets not including the first character, right curly brackets (`}`, `0x7D`) not including the last character, if it does not end with a right curly bracket, or if there are no characters between the first and the last curly brackets (i.e., if the entire path segment substring is `{}`), set the validity flag to false, ignore all other segments, and goto step 5.
+... Assume the path segment substring to be a reference template parameter.
+... If the path segment substring contains left square or curly brackets not including the first character, right square or curly brackets not including the last character, if it does not end with a right curly bracket, or if there are no characters between the first and the last curly brackets (i.e., if the entire path segment substring is `{}`), set the validity flag to false, ignore all other segments, and goto step 5.
 ... Derive the input value socket id as follows:
 .... Strip the first and the last characters, i.e., the leading left and trailing right curly brackets.
 .... Replace all instances of `~1` with `/`.
 .... Replace all instances of `~0` with `~`.
 ... If the template parameter array contains an element with the same value socket id, set the validity flag to false and goto step 5.
-... Add a new entry to the template parameter array consisting of the derived input value socket id and the path segment substring location in the pointer template string.
-.. If the first character of the path segment substring is not a left curly bracket or if the first two characters are left curly brackets:
+... Add a new entry to the template parameter array consisting of the derived input value socket id, the reference type, and the path segment substring location in the pointer template string.
+.. If the first character of the path segment substring is not a left square bracket or if the first two characters are left square brackets, or if the first character of the path segment substring is not a left curly bracket or if the first two characters are left curly brackets:
 ... Assume the path segment substring to be a literal path segment, i.e., not a template parameter.
-... If the path segment substring contains an odd number of consecutive left curly brackets or an odd number of consecutive right curly brackets, set the validity flag to false and goto step 5.
+... If the path segment substring contains an odd number of consecutive left square brackets, an odd number of consecutive right square brackets, an odd number of consecutive left curly brackets, or an odd number of consecutive right curly brackets, set the validity flag to false and goto step 5.
 5. If the validity flag is true, output the parameter array; if the validity flag is false, reject the pointer template string with a syntax error.
 
 [NOTE]
@@ -3662,13 +3697,17 @@ Implementations **MAY** optimize these steps as long as such optimizations do no
 
 - The template string `"/nodes/0/scale"` is syntactically valid and has no template parameters thus it does not yield any input value socket ids.
 
-- The template string `"/nodes/{index}/scale"` is syntactically valid and has one template parameter that yields an input value socket with id `index`.
+- The template string `"/nodes/[index]/scale"` is syntactically valid and has one template parameter that yields an integer input value socket with id `index`.
 
-- The template string `"/nodes/{index}/extras/{{index}}"` is syntactically valid and has one template parameter that yields an input value socket with id `index`. The curly brackets that are part of the `{index}` property name are doubled.
+- The template string `"/nodes/{index}/scale"` is syntactically valid and has one template parameter that yields a reference input value socket with id `index`.
 
-- The template string `"/nodes/{\~0~0index\~0~0}/rotation"` is syntactically valid and has one template parameter that yields an input value socket with id `\~~index~~`. The tilde characters used in the template parameter are encoded as `~0`.
+- The template string `"/nodes/[index]/extras/{{index}}"` is syntactically valid and has one template parameter that yields an integer input value socket with id `index`. The curly brackets that are part of the `{index}` property name are doubled.
 
-- The template string `"/nodes/{my~1index}/scale"` is syntactically valid and has one template parameter that yields an input value socket with id `my/index`. The forward slash character used in the template parameter is encoded as `~1`.
+- The template string `"/nodes/{index}/extras/[[index]]"` is syntactically valid and has one template parameter that yields a reference input value socket with id `index`. The square brackets that are part of the `[index]` property name are doubled.
+
+- The template string `"/nodes/{\~0~0index\~0~0}/rotation"` is syntactically valid and has one template parameter that yields a reference input value socket with id `\~~index~~`. The tilde characters used in the template parameter are encoded as `~0`.
+
+- The template string `"/nodes/[my~1index]/scale"` is syntactically valid and has one template parameter that yields an integer input value socket with id `my/index`. The forward slash character used in the template parameter is encoded as `~1`.
 ====
 
 [NOTE]
@@ -3676,19 +3715,43 @@ Implementations **MAY** optimize these steps as long as such optimizations do no
 ====
 - The template string `"/nodes/{index}/extras/~2"` is syntactically invalid because the `~2` character sequence is invalid in JSON Pointers, see <<rfc6901,RFC 6901>>.
 
-- The template string `"/nodes/{index}/weights/{index}"` is syntactically invalid because it yields two input value sockets with the same id.
+- The template string `"/nodes/[index]/weights/[index]"` is syntactically invalid because it yields two input value sockets with the same id.
+
+- The template string `"/nodes/{index}/weights/[index]"` is syntactically invalid because it yields two input value sockets with the same id.
+
+- The template string `"/nodes/[/scale"` is syntactically invalid because it contains a `[` path segment.
 
 - The template string `"/nodes/{/scale"` is syntactically invalid because it contains a `{` path segment.
 
+- The template string `"/nodes/[]/scale"` is syntactically invalid because the template parameter path segment has no characters between `[` and `]`.
+
 - The template string `"/nodes/{}/scale"` is syntactically invalid because the template parameter path segment has no characters between `{` and `}`.
+
+- The template string `"/nodes/[index/scale"` is syntactically invalid because the template parameter path segment does not end with `]`.
 
 - The template string `"/nodes/{index/scale"` is syntactically invalid because the template parameter path segment does not end with `}`.
 
+- The template string `"/nodes/[i[ndex]/scale"` is syntactically invalid because the template parameter path segment contains a left square bracket inside the parameter.
+
+- The template string `"/nodes/[i{ndex]/scale"` is syntactically invalid because the template parameter path segment contains a left curly bracket inside the parameter.
+
+- The template string `"/nodes/{i[ndex}/scale"` is syntactically invalid because the template parameter path segment contains a left square bracket inside the parameter.
+
 - The template string `"/nodes/{i{ndex}/scale"` is syntactically invalid because the template parameter path segment contains a left curly bracket inside the parameter.
+
+- The template string `"/nodes/[i]ndex]/scale"` is syntactically invalid because the template parameter path segment contains a right square bracket inside the parameter.
+
+- The template string `"/nodes/[i}ndex]/scale"` is syntactically invalid because the template parameter path segment contains a right curly bracket inside the parameter.
+
+- The template string `"/nodes/{i]ndex}/scale"` is syntactically invalid because the template parameter path segment contains a right square bracket inside the parameter.
 
 - The template string `"/nodes/{i}ndex}/scale"` is syntactically invalid because the template parameter path segment contains a right curly bracket inside the parameter.
 
+- The template string `"/nodes/0/extras/[[i[ndex]]"` is syntactically invalid because a literal path segment has an odd number of consecutive left square brackets.
+
 - The template string `"/nodes/0/extras/{{i{ndex}}"` is syntactically invalid because a literal path segment has an odd number of consecutive left curly brackets.
+
+- The template string `"/nodes/0/extras/[[index]"` is syntactically invalid because a literal path segment has an odd number of consecutive right square brackets.
 
 - The template string `"/nodes/0/extras/{{index}"` is syntactically invalid because a literal path segment has an odd number of consecutive right curly brackets.
 ====
@@ -3700,19 +3763,25 @@ The inputs to these steps are the `pointer` configuration value, the template pa
 1. Assume that the `pointer` configuration value is syntactically valid.
 2. Let _P_ be a copy of the `pointer` configuration value.
 3. For each element of the template parameter array taken in the descending order of parameter substring locations:
-.. Assert that the corresponding input socket value is not negative.
-.. Convert the corresponding input socket value to its decimal string representation containing only ASCII characters `0x30 ... 0x39` with no extra leading zeros.
-.. Update _P_ by replacing the template parameter substring, as identified by the template parameter location, with the decimal string value of the corresponding input value socket.
-4. Update _P_ by replacing all occurrences of the `{{` substring in it with `{`.
-5. Update _P_ by replacing all occurrences of the `}}` substring in it with `}`.
-6. Output _P_ as the effective JSON Pointer string.
+.. If the parameter is an integer:
+... Assert that the corresponding input socket value is not negative.
+... Convert the corresponding input socket value to its decimal string representation containing only ASCII characters `0x30 ... 0x39` with no extra leading zeros.
+... Update _P_ by replacing the template parameter substring, as identified by the template parameter location, with the decimal string value of the corresponding input value.
+.. If the parameter is a reference:
+... Assert that the corresponding input socket value is not a null reference.
+... Update _P_ by replacing the template parameter substring, as identified by the template parameter location, with the implementation-specific representation of the corresponding input value.
+4. Update _P_ by replacing all occurrences of the `[[` substring in it with `[`.
+5. Update _P_ by replacing all occurrences of the `]]` substring in it with `]`.
+6. Update _P_ by replacing all occurrences of the `{{` substring in it with `{`.
+7. Update _P_ by replacing all occurrences of the `}}` substring in it with `}`.
+8. Output _P_ as the effective JSON Pointer string.
 
 [NOTE]
 .Examples
 ====
-- Let the `pointer` configuration value be `"/nodes/{N}/weights/{W}"`. Then the operations using this template pointer string have the `N` and `W` input value sockets. Let the runtime `N` value be 1 and the runtime `W` value be 2. Then the effective JSON Pointer is `"/nodes/1/weights/2"`.
+- Let the `pointer` configuration value be `"/nodes/{N}/weights/[W]"`. Then the operations using this template pointer string have the `N` and `W` input value sockets with reference and integer types respectively. Let the runtime `N` value correspond to the node `<1>` and the runtime `W` value be 2. Then the effective JSON Pointer is `"/nodes/<1>/weights/2"` where `<1>` is the implementation-specific representation of the node 1.
 
-- Let the `pointer` configuration value be `"/nodes/{index}/extras/{{index}}"`. Then the operations using this template pointer string have the `index` input value socket. Let the runtime `index` value be 2. Then the effective JSON Pointer is `"/nodes/2/extras/{index}"`.
+- Let the `pointer` configuration value be `"/nodes/[index]/extras/{{index}}"`. Then the operations using this template pointer string have the integer `index` input value socket. Let the runtime `index` value be 2. Then the effective JSON Pointer is `"/nodes/2/extras/{index}"`.
 ====
 
 ===== Pointer Get
@@ -3723,8 +3792,9 @@ The inputs to these steps are the `pointer` configuration value, the template pa
 .2+| Configuration
 d| `string pointer` | JSON Pointer Template
 d| `int type`       | Property type index
-| Input value sockets
-| `int <parameter>` | Zero or more JSON Pointer template parameters to be evaluated at runtime; input value socket ids correspond to the pointer's path segments wrapped with curly brackets (`{}`)
+.2+| Input value sockets
+d| `int <parameter>` | Zero or more JSON Pointer integer template parameters to be evaluated at runtime; input value socket ids correspond to the pointer's path segments wrapped with square brackets (`[]`)
+d| `ref <parameter>` | Zero or more JSON Pointer reference template parameters to be evaluated at runtime; input value socket ids correspond to the pointer's path segments wrapped with curly brackets (`{}`)
 .2+| Output value sockets
 d| `T value`  | The resolved property value
 d| `bool isValid`  | True if the property value can be resolved; false otherwise
@@ -3749,7 +3819,7 @@ The type `T` is determined by the `type` configuration value which points to the
 ====
 - If the `pointer` configuration value is `"/nodes/0/translation"`, the operation has no input value sockets and the pointer always refers to the `translation` property of the glTF node 0.
 
-- If the `pointer` configuration value is `"/nodes/{myId}/scale"`, the operation has the `myId` input value socket, which value denotes the glTF node index.
+- If the `pointer` configuration value is `"/nodes/{myId}/scale"`, the operation has the `myId` reference input value socket, which value denotes the glTF node reference.
 ====
 
 If the `pointer` configuration value is not provided, if it is not a string, or if it is invalid (as defined in the previous sections), the interactivity node is invalid and the graph **MUST** be rejected.
@@ -3761,7 +3831,7 @@ If the number of input value sockets derived from the pointer template string ex
 When any of the output value sockets is accessed:
 
 1. Evaluate all input values.
-2. If any of the input values is negative:
+2. If any of the integer input values is negative or any of the reference input values is null:
 .. set the `isValid` output value to false;
 .. set the `value` output value to the default value for the type `T`;
 .. skip the next steps.
@@ -3777,7 +3847,7 @@ Pointers containing `extras` properties are out of scope of this specification b
 [NOTE]
 .Examples
 ====
-- If the `pointer` configuration value is `"/nodes/{myId}/scale"`, the type `T` is `float3`, and the `myId` input value is negative or greater than or equal to the total number of glTF nodes, then the `isValid` output value is false and the `value` output value is `[NaN, NaN, NaN]`.
+- If the `pointer` configuration value is `"/nodes/[myId]/scale"`, the type `T` is `float3`, and the `myId` input value is negative or greater than or equal to the total number of glTF nodes, then the `isValid` output value is false and the `value` output value is `[NaN, NaN, NaN]`.
 
 - If the `pointer` configuration value is `"/nodes/{myId}/scale"` and the type `T` is `float4`, then the `isValid` output value is false and the `value` output value is `[NaN, NaN, NaN, NaN]`. Note that `myId` input value becomes irrelevant in this case because even if it is valid the Object Model property type does not match the declared type `T`.
 ====
@@ -3798,8 +3868,9 @@ d| `string pointer` | JSON Pointer Template
 d| `int type`       | Property type index
 | Input flow sockets
 | `in` | The entry flow into this operation
-.2+| Input value sockets
-d| `int <parameter>` | Zero or more JSON Pointer template parameters to be evaluated at runtime; input value socket ids correspond to the pointer's path segments wrapped with curly brackets (`{}`)
+.3+| Input value sockets
+d| `int <parameter>` | Zero or more JSON Pointer integer template parameters to be evaluated at runtime; input value socket ids correspond to the pointer's path segments wrapped with square brackets (`[]`)
+d| `ref <parameter>` | Zero or more JSON Pointer reference template parameters to be evaluated at runtime; input value socket ids correspond to the pointer's path segments wrapped with curly brackets (`{}`)
 d| `T value` | The new property value
 .2+| Output flow sockets
 d| `out` | The flow to be activated if the property was set
@@ -3820,7 +3891,7 @@ This operation sets a glTF Asset Object Model property value using the effective
 
 The type `T` is determined by the `type` configuration value which points to the element of the <<json-types,`types`>> array. Input value socket ids are defined by parsing the JSON Pointer Template string as described above.
 
-If the `pointer` configuration value is not provided, if it is not a string, if it is invalid (as defined in the previous sections), or if it contains a template parameter `{value}`, the interactivity node is invalid and the graph **MUST** be rejected.
+If the `pointer` configuration value is not provided, if it is not a string, if it is invalid (as defined in the previous sections), or if it contains a template parameter `[value]` or `{value}`, the interactivity node is invalid and the graph **MUST** be rejected.
 
 If the `type` configuration value is not provided, if it is not a literal number, if it is not exactly representable as a 32-bit signed integer, if it is negative, or if it is greater than or equal to the length of the `types` array, the interactivity node is invalid and the graph **MUST** be rejected.
 
@@ -3839,7 +3910,7 @@ This operation has no internal state.
 When the `in` input flow is activated:
 
 1. Evaluate all input values.
-2. If any of the `<parameter>` input values is negative,
+2. If any of the `<parameter>` integer input values is negative or any of the `<parameter>` reference input values is null:
 .. activate the `err` output flow and skip the next steps.
 3. Generate the effective JSON Pointer as described in the previous sections.
 4. If the effective JSON Pointer cannot be resolved against the glTF asset, if the Object Model type of the resolved property does not match the type `T`, or if the property is not mutable,
@@ -3865,8 +3936,9 @@ d| `string pointer` | JSON Pointer Template
 d| `int type`       | Property type index
 | Input flow sockets
 | `in` | The entry flow into this operation
-.5+| Input value sockets
-d| `int <parameter>` | Zero or more JSON Pointer template parameters to be evaluated at runtime; input value socket ids correspond to the pointer's path segments wrapped with curly brackets (`{}`)
+.6+| Input value sockets
+d| `int <parameter>` | Zero or more JSON Pointer integer template parameters to be evaluated at runtime; input value socket ids correspond to the pointer's path segments wrapped with square brackets (`[]`)
+d| `ref <parameter>` | Zero or more JSON Pointer reference template parameters to be evaluated at runtime; input value socket ids correspond to the pointer's path segments wrapped with curly brackets (`{}`)
 d| `T value` | The target property value
 d| `float duration` | The time, in seconds, in which the property **SHOULD** reach the target value
 d| `float2 p1` | Control point P1
@@ -3891,7 +3963,7 @@ This operation interpolates and updates the glTF Asset Object Model property mul
 
 The type `T` is determined by the `type` configuration value which points to the element of the <<json-types,`types`>> array. Input value socket ids are defined by parsing the JSON Pointer Template string as described above.
 
-If the `pointer` configuration value is not provided, if it is not a string, if it is invalid (as defined in the previous sections), or if it contains template parameters `{value}`, `{duration}`, `{p1}`, or `{p2}` the interactivity node is invalid and the graph **MUST** be rejected.
+If the `pointer` configuration value is not provided, if it is not a string, if it is invalid (as defined in the previous sections), or if it contains template parameters `[value]`, `{value}`, `[duration]`, `{duration}`, `[p1]`, `{p1}`, `[p2]`, or `{p2}` the interactivity node is invalid and the graph **MUST** be rejected.
 
 If the `type` configuration value is not provided, if it is not a literal number, if it is not exactly representable as a 32-bit signed integer, if it is negative, if it is greater than or equal to the length of the `types` array, or if it point to the type entry with `bool` or `int` type signatures, the interactivity node is invalid and the graph **MUST** be rejected.
 
@@ -3924,7 +3996,7 @@ This array is initially empty and its maximum size is implementation-specific.
 When the `in` input flow is activated:
 
 1. Evaluate all input values.
-2. If any of the `<parameter>` input values is negative,
+2. If any of the `<parameter>` integer input values is negative or any of the `<parameter>` reference input values is null:
 .. activate the `err` output flow and skip the next steps.
 3. Generate the effective JSON Pointer as described in the previous sections.
 4. If the effective JSON Pointer cannot be resolved against the glTF asset, if the Object Model type of the resolved property does not match the type `T`, or if the property is not mutable,
@@ -3976,7 +4048,7 @@ The `/nodes/{}/weights` pointer defined in the glTF Asset Object Model has the `
 | Input flow sockets
 | `in` | The entry flow into this operation
 .4+| Input value sockets
-d| `int animation` | Animation index
+d| `ref animation` | Animation reference
 d| `float startTime` | Start time in seconds
 d| `float endTime` | End time in seconds
 d| `float speed` | Speed multiplier
@@ -4013,7 +4085,7 @@ This operation has no internal state.
 
 The internal state of an execution graph having one or more interactivity nodes with the `animation/start` operation includes an implementation-defined _animation state dynamic array_ each element of which contains the following data:
 
-- Animation index
+- Animation reference
 - Start time value
 - End time value
 - Stop time value (see `animation/stopAt`)
@@ -4027,7 +4099,7 @@ This array is initially empty; its maximum size is implementation-specific.
 When the `in` input flow is activated:
 
 1. Evaluate all input values.
-2. If the `animation` input value is negative or greater than or equal to the number of glTF animations in the asset,
+2. If the `animation` input value is not a valid glTF animation reference,
 .. activate the `err` output flow and skip the next steps.
 3. If the `startTime` or `endTime` input values are NaN or if the `startTime` input value is infinite,
 .. activate the `err` output flow and skip the next steps.
@@ -4035,7 +4107,7 @@ When the `in` input flow is activated:
 .. activate the `err` output flow and skip the next steps.
 5. If starting a new animation exceeds an implementation-specific limit on the maximum number of active animations or if the referenced glTF animation is invalid as determined by the implementation,
 .. activate the `err` output flow and skip the next steps.
-6. If the _animation state dynamic array_ contains an entry with the same animation index,
+6. If the _animation state dynamic array_ contains an entry with the same animation reference,
 .. remove it from the array; the previously set `done` flows **MUST NOT** be activated.
 7. Add a new entry to the _animation state dynamic array_ filling it with the required information based on the evaluated input values. The stop time value **MUST** be set to the end time value and the stop completion pointer **MUST** be set to null.
 8. Activate the `out` output flow.
@@ -4091,7 +4163,7 @@ During the last 5 seconds, the position of the glTF node zero is well-defined ag
 | Input flow sockets
 | `in` | The entry flow into this operation
 | Input value sockets
-| `int animation` | Animation index
+| `ref animation` | Animation reference
 .2+| Output flow sockets
 d| `out` | The flow to be activated if the animation index is valid
 d| `err` | The flow to be activated if the animation index is invalid
@@ -4104,9 +4176,9 @@ This operation has no internal state.
 When the `in` input flow is activated:
 
 1. Evaluate all input values.
-2. If the `animation` input value is negative or greater than or equal to the number of glTF animations in the asset,
+2. If the `animation` input value is not a valid glTF animation reference,
 .. activate the `err` output flow and skip the next steps.
-3. If the _animation state dynamic array_ exists and contains an entry with the same animation index,
+3. If the _animation state dynamic array_ exists and contains an entry with the same animation reference,
 .. remove it from the array and stop the playing animation. The animated properties **MUST** keep their current values and the previously associated `done` flows **MUST NOT** be activated.
 4. Activate the `out` output flow.
 
@@ -4118,7 +4190,7 @@ When the `in` input flow is activated:
 | Input flow sockets
 | `in` | The entry flow into this operation
 .2+| Input value sockets
-d| `int animation` | Animation index
+d| `ref animation` | Animation reference
 d| `float stopTime` | Stop time in seconds
 .3+| Output flow sockets
 d| `out` | The flow to be activated if the input values are valid
@@ -4133,7 +4205,7 @@ This operation has no internal state.
 When the `in` input flow is activated:
 
 1. Evaluate all input values.
-2. If the `animation` input value is negative or greater than or equal to the number of glTF animations in the asset,
+2. If the `animation` input value is not a valid glTF animation reference,
 .. activate the `err` output flow and skip the next steps.
 3. If the `stopTime` input value is NaN,
 .. activate the `err` output flow and skip the next steps.
@@ -4151,37 +4223,86 @@ When the `in` input flow is activated:
 [cols="1h,1,2"]
 |===
 | Operation | `event/onStart` | Start event
+| Output value sockets
+| `ref event` | The event reference
 | Output flow sockets
 | `out`  | The flow to be activated when the start event happens
 |===
 
 Interactivity nodes with this operation are activated when all glTF asset resources are loaded and ready for rendering and interactions.
 
-This operation has no internal state.
+The internal state of this operation consists of the event reference value initialized to null. It **MUST** be set to the reference to the implementation-specific event representation before the `out` output flow is activated.
 
-If multiple interactivity nodes with this operation exist in the graph, they **MUST** be activated sequentially in the order they appear in JSON.
+If multiple interactivity nodes with this operation exist in the graph, they **MUST** be activated sequentially in the order they appear in JSON. All interactivity nodes with this operation **MUST** return the same event reference on activation.
 
 ===== On Tick
 
 [cols="1h,1,2"]
 |===
 | Operation | `event/onTick` | Tick event
-.2+| Output value sockets
+.3+| Output value sockets
 d| `float timeSinceStart` | Relative time in seconds since the graph execution start
 d| `float timeSinceLastTick` | Relative time in seconds since the last tick occurred
+d| `ref event` | The event reference
 | Output flow sockets
 | `out` | The flow to be activated when the tick event happens
 |===
 
 Interactivity nodes with this operations are activated when a tick occurs. There will be at most one tick per rendered frame, which **SHOULD** align with frame time, but there are no guarantees of time elapsed between ticks.
 
-The internal state of this operation consists of two floating-point time values initialized to NaN. They **MUST** be set to their effective values before the `out` output flow is activated.
+The internal state of this operation consists of two floating-point time values initialized to NaN and the event reference value initialized to null. They **MUST** be set to their effective values before the `out` output flow is activated.
 
 The first activation of an interactivity node with this operation **MUST** happen after activating all interactivity nodes with the `event/onStart` operation if the latter is present in the graph.
 
 On the very first tick event, the `timeSinceStart` output value **MUST** be set to zero and the `timeSinceLastTick` output value **MUST** remain NaN.
 
 If multiple interactivity nodes with this operation exist in the graph, they **MUST** be activated sequentially in the order they appear in JSON and they **MUST** have the same output values within the same tick.
+
+==== Event Control Operations
+
+===== Stop Propagation
+
+[cols="1h,1,2"]
+|===
+| Operation | `event/stopPropagation` | Stop event propagation
+| Input flow sockets
+| `in` | The entry flow into this operation
+.2+| Input value sockets
+d| `bool stopImmediate` | Whether to stop event propagation to the subsequent interactivity nodes
+d| `ref event` | Event reference
+| Output flow sockets
+| `out` | The flow to be activated after executing this operation
+|===
+
+This operation prevents further activations of event handlers associated with the event reference.
+
+If the `stopImmediate` input value is false, this operation only prevents transitive activations of event handlers, for example, handlers activated by propagating the event through the scene graph.
+
+[NOTE]
+.Implementation Note
+====
+The events defined in this specification, i.e., `event/onStart` and `event/onTick`, do not cause any transitive activations.
+====
+
+If the `stopImmediate` input value is true, this operation prevents transitive activations of event handlers and the activations of the event handlers for the same event defined in the behavior graph that have not been activated yet.
+
+[NOTE]
+.Example
+====
+Let's say a behavior graph contains two interactivity nodes with the `event/onTick` operation and the first interactivity node unconditionally activates an interactivity node with the `event/stopPropagation` operation passing the event reference and setting the `stopImmediate` input value to true. Then the second interactivity node with the `event/onTick` operation is never activated.
+====
+
+This operation has no internal state.
+
+When the `in` input flow is activated:
+
+1. Evaluate all input values.
+2. If the `event` input value is not a valid event reference,
+.. activate the `out` output flow and skip the next steps.
+3. Cancel all pending transitive activations of the interactivity event nodes associated with the `event` input value.
+4. If the `stopImmediate` input value is true,
+.. cancel all pending immediate activations of the interactivity event nodes associated with the `event` input value.
+5. Activate the `out` output flow.
 
 ==== Custom Event Operations
 
@@ -4192,8 +4313,9 @@ If multiple interactivity nodes with this operation exist in the graph, they **M
 | Operation | `event/receive` | Receive a custom event
 | Configuration
 | `int event` | The custom event index
-| Output value sockets
-| `<custom>` | Output values defined by the custom event
+.2+| Output value sockets
+d| `<custom>` | Output values defined by the custom event
+d| `ref event` | The event reference
 | Output flow sockets
 | `out` | The flow to be activated when the custom event happens
 |===
@@ -4212,7 +4334,7 @@ Interactivity nodes with this operation are activated when a custom event specif
 
 The `event` configuration value **MUST** be non-negative and less than the total number of custom event definitions, otherwise the interactivity node is invalid and the graph **MUST** be rejected.
 
-The internal state of this operation consists of all output value sockets initialized to <<variables-types,type-default>> values or to the initial values defined by the custom event index. If the event is originated by an external environment, output values not set by the external environment **MUST** be reset to type-default or initial values on each interactivity node activation.
+The internal state of this operation consists of all output value sockets initialized to <<variables-types,type-default>> values or to the initial values defined by the custom event index and the event reference value initialized to null. If the event is originated by an external environment, output values not set by the external environment **MUST** be reset to type-default or initial values on each interactivity node activation.
 
 [NOTE]
 .Example
@@ -4545,11 +4667,14 @@ The `value` property is an array that defines the initial variable value. If the
 | `float3x3` |            9 | Nine floating-point NaNs
 | `float4x4` |           16 | Sixteen floating-point NaNs
 | `int`      |            1 | Integer zero
+| `ref`      |            1 | Null reference
 |===
 
 Values for vector types use the XYZW order of components, that is X component is stored in the array element with index 0, Y component is stored in the array element with index 1, and so forth.
 
 Values for matrix types use the column-major order of elements. For example, elements of a 2x2 matrix are stored as `[c0r0, c0r1, c1r0, c1r1]`, where `c0r0` is the element in the first column and first row, `c0r1` is the element in the first column and second row, and so forth.
+
+Values for the reference type are specified using static JSON Pointers without any template parameters. If the JSON pointer can be resolved against the glTF asset to a valid reference value, that value is used; if the pointer cannot be resolved, the reference value is null.
 
 If the `value` property array length does not match the array length for the specified type, the variable is invalid and the graph **MUST** be rejected.
 
@@ -4558,6 +4683,8 @@ If the variable type is **bool** and the only array element is not a JSON boolea
 If the variable type is any of the **floatN** or **floatNxN** types and any of the array elements is not a JSON number, the variable is invalid and the graph **MUST** be rejected.
 
 If the variable type is **int** and the only array element is not a JSON number exactly representable as a 32-bit signed integer, the variable is invalid and the graph **MUST** be rejected.
+
+If the variable type is **ref** and the only array element is not a JSON string or it is not a syntactically valid JSON Pointer as defined in <<rfc6901,RFC 6901>>, the variable is invalid and the graph **MUST** be rejected.
 
 If the variable type is custom, the `value` property is defined by the extension defining the custom type.
 
@@ -4596,7 +4723,7 @@ The event id is an application-specific event identifier recognized by the execu
 
 The properties of the `values` object define ids and the values of those properties define types and optional initial values of the value sockets associated with the event. If the `values` object is undefined, the event has no associated value sockets.
 
-Socket ids defined by the properties of the `values` object are case-sensitive.
+Socket ids defined by the properties of the `values` object are case-sensitive. The `values` object **MUST NOT** contain an `event` property.
 
 The type of the event value socket is determined by the **REQUIRED** `type` property that points to the element of the `types` array. If the `type` property is undefined or its value is not a non-negative integer less than the length of the `types` array, the event is invalid and the graph **MUST** be rejected.
 
@@ -5119,6 +5246,7 @@ the behavior graph is invalid and thus cannot be used; this has no effect on oth
 .. if the `values` object has more properties than the implementation-specific limit on the number of event value sockets,
 ... _reject the graph_;
 .. for each property of the `values` JSON object:
+... _assert_ that the property name is not `event`;
 ... _assert_ that the property is a JSON object ("`the event value`");
 ... _assert_ that "`the event value`" object has the `type` property that is a _JSON index_;
 ... if the `type` property value is not less than the `types` graph array length,
@@ -5228,7 +5356,7 @@ the behavior graph is invalid and thus cannot be used; this has no effect on oth
 == Inline Value Object Validation
 
 1. Let "`the array`" be the JSON array representing the inline value and "`the type signature`" be the type signature associated with it.
-2. If "`the type signature`" is `"bool"`, `"float"`, or `"int"` and "`the array`" length is not one,
+2. If "`the type signature`" is `"bool"`, `"float"`, `"int"`, or `"ref"` and "`the array`" length is not one,
 .. _reject the graph_.
 3. If "`the type signature`" is `"float2"` and "`the array`" length is not two,
 .. _reject the graph_.
@@ -5244,5 +5372,7 @@ the behavior graph is invalid and thus cannot be used; this has no effect on oth
 .. _reject the graph_.
 9. If "`the type signature`" is `"int"` and the only element of "`the array`" is not exactly representable as a 32-bit signed integer,
 .. _reject the graph_.
-10. If "`the type signature`" is any of the seven float types defined in this Specification and any element of "`the array`" is not a JSON number,
+10. If "`the type signature`" is `"ref"` and the only element of "`the array`" is not a JSON string or it is not a syntactically valid JSON Pointer,
+.. _reject the graph_.
+11. If "`the type signature`" is any of the seven float types defined in this Specification and any element of "`the array`" is not a JSON number,
 .. _reject the graph_.
