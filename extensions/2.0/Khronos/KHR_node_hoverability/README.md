@@ -94,7 +94,7 @@ When used in conjunction with `KHR_interactivity`, two new interactivity operati
 |-------------------------|-----------------------|-|
 | **Operation**           | `event/onHoverIn`     | Hover In event |
 | **Configuration**       | `int nodeIndex`       | Index of the glTF node that has this event handler |
-| **Output values**       | `ref hoverNode`       | Reference to the glTF node on which “hover” action was started |
+| **Output values**       | `ref hoveredNode`     | Reference to the glTF node on which “hover” action was started |
 |                         | `int controllerIndex` | Index of the controller that generated the event |
 |                         | `ref event`           | The event reference |
 | **Output flow sockets** | `out`                 | The flow to be activated when the Hover In event happens |
@@ -103,7 +103,7 @@ Interactivity nodes with this operation are activated when a “hover” action 
 
 If the `nodeIndex` configuration value is negative or greater than or equal to the number of glTF nodes in the asset, the `event/onHoverIn` interactivity node is invalid.
 
-The internal state of this interactivity node consists of the `hoverNode`, `controllerIndex`, and `event` output values initialized to null, -1, and null respectively.
+The internal state of this interactivity node consists of the `hoveredNode`, `controllerIndex`, and `event` output values initialized to null, -1, and null respectively.
 
 In the case of multiple-controller systems, the `controllerIndex` output value **MUST** be set to the index of the controller that generated the event; in single-controller systems, this output value **MUST** be set to zero.
 
@@ -115,7 +115,7 @@ If multiple interactivity nodes with this operation and the same configuration e
 |-------------------------|-----------------------|-|
 | **Operation**           | `event/onHoverOut`    | Hover Out event |
 | **Configuration**       | `int nodeIndex`       | Index of the glTF node that has this event handler |
-| **Output values**       | `ref hoverNode`       | Reference to the glTF node on which “hover” action was initiated |
+| **Output values**       | `ref hoveredNode`     | Reference to the glTF node on which “hover” action was initiated |
 |                         | `int controllerIndex` | Index of the controller that generated the event |
 |                         | `ref event`           | The event reference |
 | **Output flow sockets** | `out`                 | The flow to be activated when the Hover Out event happens |
@@ -124,7 +124,7 @@ Interactivity nodes with this operation are activated when a “hover” action 
 
 If the `nodeIndex` configuration value is negative or greater than or equal to the number of glTF nodes in the asset, the `event/onHoverOut` interactivity node is invalid.
 
-The internal state of this interactivity node consists of the `hoverNode`, `controllerIndex`, and `event` output values initialized to null, -1, and null respectively.
+The internal state of this interactivity node consists of the `hoveredNode`, `controllerIndex`, and `event` output values initialized to null, -1, and null respectively.
 
 In the case of multiple-controller systems, the `controllerIndex` output value **MUST** be set to the index of the controller that generated the event; in single-controller systems, this output value **MUST** be set to zero.
 
