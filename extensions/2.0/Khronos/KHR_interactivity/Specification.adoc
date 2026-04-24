@@ -2887,17 +2887,21 @@ d| `bool b` | Second argument
 |===
 | Operation | `ref/eq` | Equality operation
 .2+| Input value sockets
-d| `ref a` | First argument
-d| `ref b` | Second argument
+d| `ref a` | First reference
+d| `ref b` | Second reference
 | Output value sockets
 | `bool value` | True if the input arguments are equal; false otherwise
 |===
 
-Valid references are equal if and only if they refer to the same object.
+The `value` output value is determined as follows:
 
-If any argument is an invalidated reference, the comparison result is undefined.
-
-All null references are equal to each other. A null reference is not equal to a non-null reference.
+1. If both input values are null references,
+.. set the `value` output value to true and skip the next steps.
+2. If one of the input values is a null reference and another input value is not a null reference,
+.. set the `value` output value to false and skip the next steps.
+3. If both input values refer to the same object regardless of whether that object exists,
+.. set the `value` output value to true and skip the next step.
+4. Set the `value` output value to false.
 
 === Type Conversion Operations
 
@@ -4248,7 +4252,7 @@ d| `ref event` | The event reference
 | `out` | The flow to be activated when the tick event happens
 |===
 
-Interactivity nodes with this operations are activated when a tick occurs. There will be at most one tick per rendered frame, which **SHOULD** align with frame time, but there are no guarantees of time elapsed between ticks.
+Interactivity nodes with this operation are activated when a tick occurs. There will be at most one tick per rendered frame, which **SHOULD** align with frame time, but there are no guarantees of time elapsed between ticks.
 
 The internal state of this operation consists of two floating-point time values initialized to NaN and the event reference value initialized to null. They **MUST** be set to their effective values before the `out` output flow is activated.
 
@@ -4501,7 +4505,7 @@ The `position` read-only property represents the “active camera” position in
 
 An implementation **MAY** provide no “active camera” data, for example for privacy reasons or if no cameras are being displayed to the user. If the “active camera” position is unavailable, the `position` property **MUST** be set to all NaNs; if the “active camera” rotation is unavailable, the `rotation` property **MUST** be set to all NaNs.
 
-The following pointers represent the properties defined in this section.
+The following pointers represent the read-only properties defined in this section.
 
 [options="header",cols="50%,15%"]
 |===
@@ -4528,16 +4532,37 @@ The `playhead` read-only property represents the current animation position with
 
 The `virtualPlayhead` read-only property represents the current animation position on the infinite timeline that is used for the input value sockets of the `animation/start` and `animation/stop` operations. For valid glTF animations, the property value is equal to the last requested timestamp. Before the animation start, this property is zero; when the animation stops, the property value retains its last value until the animation is restarted. For invalid glTF animations, the property value is always NaN.
 
-The following pointers represent the properties defined in this section.
+The following pointers represent the read-only properties defined in this section.
 
 [options="header",cols="50%,15%"]
 |===
 | Pointer                                                       | Type
+| `/animations/[]/extensions/KHR_interactivity/isPlaying`       | `bool`
 | `/animations/{}/extensions/KHR_interactivity/isPlaying`       | `bool`
+| `/animations/[]/extensions/KHR_interactivity/minTime`         | `float`
 | `/animations/{}/extensions/KHR_interactivity/minTime`         | `float`
+| `/animations/[]/extensions/KHR_interactivity/maxTime`         | `float`
 | `/animations/{}/extensions/KHR_interactivity/maxTime`         | `float`
+| `/animations/[]/extensions/KHR_interactivity/playhead`        | `float`
 | `/animations/{}/extensions/KHR_interactivity/playhead`        | `float`
+| `/animations/[]/extensions/KHR_interactivity/virtualPlayhead` | `float`
 | `/animations/{}/extensions/KHR_interactivity/virtualPlayhead` | `float`
+|===
+
+=== Delay References
+
+To check if a given reference value represents a valid delay object, the behavior graph can query the runtime value of the corresponding read-only virtual property using the `pointer/get` operation as described in this section.
+
+If the input reference value is not null and it is contained in the dynamic array of delay activation references (see the `flow/setDelay` operation), the `pointer/get` operation succeeds and thus sets the `isValid` output value to true and the `value` output value to the input reference value.
+
+If the input reference value is null or it is not contained in the dynamic array of delay activation references, the `pointer/get` operation fails and thus sets the `isValid` output value is false and the `value` output value is null.
+
+The following pointer represents the read-only property defined in this section.
+
+[options="header",cols="50%,15%"]
+|===
+| Pointer                                   | Type
+| `/extensions/KHR_interactivity/delays/{}` | `ref`
 |===
 
 = JSON Syntax
